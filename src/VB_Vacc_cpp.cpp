@@ -23,6 +23,8 @@ private:
     double a_alpha;
     double b_alpha;
     arma::mat mu_alpha;
+    double nu;
+    double eta2;
   } hyperparas;
   
   
@@ -88,10 +90,13 @@ public:
   };
   
   void set_hyperparas(const double& in_a_alpha, const double& in_b_alpha,
-                      const arma::mat& in_mu_alpha){
+                      const arma::mat& in_mu_alpha,
+                      const double& in_nu,const double& in_eta2){
     hyperparas.a_alpha = in_a_alpha;
     hyperparas.b_alpha = in_b_alpha;
     hyperparas.mu_alpha = in_mu_alpha;
+    hyperparas.nu = in_nu;
+    hyperparas.eta2 = in_eta2;
   };
   
   void set_paras_initial_values(const arma::vec& in_beta,
@@ -119,10 +124,11 @@ public:
     
     vb_paras.E_phi.zeros(dat.num_reports, dat.num_AEs);
     update_E_phi();
+    //std::cout << find_nonfinite(vb_paras.E_phi)<< std::endl;
     
     vb_paras.E_omega.zeros(dat.num_reports, dat.num_AEs);
     update_E_omega();
-    
+    //std::cout << find_nonfinite(vb_paras.E_omega)<< std::endl;
     vb_paras.log_det_cov_alpha.zeros(dat.num_AEs);
   };
   
@@ -153,21 +159,22 @@ public:
       vb_paras.Var_beta(j) = 1/(accu(dat.V % vb_paras.E_omega.col(j)) + vb_paras.E_inv_sigma2_beta(j));
     }
     // vb_paras.Var_beta = 1/(vb_paras.E_omega.t() * dat.V+ vb_paras.E_inv_sigma2_beta);
+     //std::cout << vb_paras.Var_beta<< std::endl;
   };
   
   void update_E_beta(){
     
-    for(int j=0; j<dat.num_AEs; j++){
-      vb_paras.E_beta(j) = accu((dat.A.col(j) - dat.nn/2 -  vb_paras.E_omega.col(j)%(dat.X*vb_paras.E_alpha.col(j)))%dat.V);
-      vb_paras.E_beta(j) *= vb_paras.Var_beta(j);
-      vb_paras.E_beta_sq(j) = vb_paras.E_beta(j)*vb_paras.E_beta(j) + vb_paras.Var_beta(j);
-      //std::cout << vb_paras.E_beta(j) << std::endl;
-    }
-    // vb_paras.temp = (dat.A.each_col() - dat.nn/2) - vb_paras.E_omega%(dat.X*vb_paras.E_alpha);
-    // vb_paras.temp = vb_paras.temp.each_col()%dat.V;
-    // vb_paras.E_beta = conv_to< colvec >::from(sum(vb_paras.temp, 0));
-    // vb_paras.E_beta %= vb_paras.Var_beta;
-    // vb_paras.E_beta_sq = vb_paras.E_beta%vb_paras.E_beta + vb_paras.Var_beta;
+    // for(int j=0; j<dat.num_AEs; j++){
+    //   vb_paras.E_beta(j) = accu((dat.A.col(j) - dat.nn/2 -  vb_paras.E_omega.col(j)%(dat.X*vb_paras.E_alpha.col(j)))%dat.V);
+    //   vb_paras.E_beta(j) *= vb_paras.Var_beta(j);
+    //   vb_paras.E_beta_sq(j) = vb_paras.E_beta(j)*vb_paras.E_beta(j) + vb_paras.Var_beta(j);
+    //   //std::cout << vb_paras.E_beta(j) << std::endl;
+    // }
+    vb_paras.temp = (dat.A.each_col() - dat.nn/2) - vb_paras.E_omega%(dat.X*vb_paras.E_alpha);
+    vb_paras.temp = vb_paras.temp.each_col()%dat.V;
+    vb_paras.E_beta = conv_to< colvec >::from(sum(vb_paras.temp, 0));
+    vb_paras.E_beta %= vb_paras.Var_beta;
+    vb_paras.E_beta_sq = vb_paras.E_beta%vb_paras.E_beta + vb_paras.Var_beta;
     // std::cout << vb_paras.E_beta<< std::endl;
   };
   
@@ -176,7 +183,7 @@ public:
     // for(int j=0; j<dat.num_AEs; j++){
     //   vb_paras.E_inv_sigma2_beta(j) = 1/(vb_paras.E_beta_sq(j)/2 + vb_paras.E_inv_a_beta);
     // }
-    vb_paras.E_inv_sigma2_beta = 1/(vb_paras.E_beta_sq/2 + vb_paras.E_inv_a_beta);
+    vb_paras.E_inv_sigma2_beta = 1/(vb_paras.E_beta_sq/2 + hyperparas.nu*vb_paras.E_inv_a_beta);
   };
   
   void update_E_inv_sigma2_alpha(){
@@ -190,10 +197,11 @@ public:
   void update_E_alpha(){
     //arma::vec ind = linspace(0, dat.num_AEs-1, dat.num_AEs);
     for(int j=0; j<dat.num_AEs; j++){
-      vb_paras.cov_mat_j = dat.X.t()*diagmat(vb_paras.E_omega.col(j))*dat.X + diagmat(vb_paras.E_inv_sigma2_alpha.col(j));
-      // vb_paras.cov_mat_j = dat.X.each_col()%vb_paras.E_omega.col(j);
-      // vb_paras.cov_mat_j =  vb_paras.cov_mat_j.t()*dat.X;
-      // vb_paras.cov_mat_j.diag() += vb_paras.E_inv_sigma2_alpha.col(j);
+      // vb_paras.cov_mat_j = dat.X.t()*diagmat(vb_paras.E_omega.col(j))*dat.X + diagmat(vb_paras.E_inv_sigma2_alpha.col(j));
+      vb_paras.cov_mat_j = dat.X.each_col()%vb_paras.E_omega.col(j);
+      vb_paras.cov_mat_j =  vb_paras.cov_mat_j.t()*dat.X;
+      vb_paras.cov_mat_j.diag() += vb_paras.E_inv_sigma2_alpha.col(j);
+      
       vb_paras.cov_mat_j = inv(vb_paras.cov_mat_j);
       vb_paras.Var_alpha.col(j) = vb_paras.cov_mat_j.diag();
       vb_paras.E_alpha.col(j) = vb_paras.cov_mat_j * (dat.X.t() * (dat.A.col(j) - dat.nn/2 - vb_paras.E_omega.col(j)%dat.V*vb_paras.E_beta(j)) + vb_paras.E_inv_sigma2_alpha.col(j) % hyperparas.mu_alpha.col(j));
@@ -206,7 +214,7 @@ public:
   };
   
   void update_E_inv_a_beta(){
-    vb_paras.E_inv_a_beta = ((dat.num_AEs+1)/2)/(accu(vb_paras.E_inv_sigma2_beta)+1);
+    vb_paras.E_inv_a_beta = ((dat.num_AEs*hyperparas.nu+1)/2)/(hyperparas.nu*accu(vb_paras.E_inv_sigma2_beta)+1/hyperparas.eta2);
   };
   
   void update_E_phi(){
@@ -217,6 +225,8 @@ public:
     //   }
     // }
     vb_paras.E_phi = dat.X*vb_paras.E_alpha + dat.V*vb_paras.E_beta.t();
+    //std::cout << find_nonfinite(vb_paras.E_alpha)<< std::endl;
+    //std::cout << find_nonfinite(vb_paras.E_beta)<< std::endl;
   }
   
   void update_E_omega(){
@@ -234,7 +244,7 @@ public:
     vb_paras.temp = tanh(vb_paras.E_phi/2)/(2*vb_paras.E_phi);
     vb_paras.E_omega = vb_paras.temp.each_col()%dat.nn;
     //uvec indices = find_nonfinite(vb_paras.E_omega);
-    vb_paras.E_omega.elem( find_nonfinite(vb_paras.E_omega) ).fill(1000);
+    //vb_paras.E_omega.elem( find_nonfinite(vb_paras.E_omega) ).fill(1000);
   };
   
   void update_log_cosh_b(){
@@ -245,10 +255,11 @@ public:
   
   void update_log_det_cov_mat(){
     for(int j=0; j<dat.num_AEs; j++){
-      vb_paras.cov_mat_j = dat.X.t()*diagmat(vb_paras.E_omega.col(j))*dat.X + diagmat(vb_paras.E_inv_sigma2_alpha.col(j));
-      // vb_paras.cov_mat_j = dat.X.each_col()%vb_paras.E_omega.col(j);
-      // vb_paras.cov_mat_j =  vb_paras.cov_mat_j.t()*dat.X;
-      // vb_paras.cov_mat_j.diag() += vb_paras.E_inv_sigma2_alpha.col(j);
+      // vb_paras.cov_mat_j = dat.X.t()*diagmat(vb_paras.E_omega.col(j))*dat.X + diagmat(vb_paras.E_inv_sigma2_alpha.col(j));
+      vb_paras.cov_mat_j = dat.X.each_col()%vb_paras.E_omega.col(j);
+      vb_paras.cov_mat_j =  vb_paras.cov_mat_j.t()*dat.X;
+      vb_paras.cov_mat_j.diag() += vb_paras.E_inv_sigma2_alpha.col(j);
+      
       vb_paras.log_det_cov_alpha(j) = log_det_sympd(vb_paras.cov_mat_j);
       // double sign;
       // bool ok = log_det(vb_paras.log_det_cov_alpha(j), sign, cov_mat_j);
@@ -258,12 +269,12 @@ public:
   void update_ELBO(){
     vb_paras.ELBO = accu((dat.A.each_col() - dat.nn/2)%vb_paras.E_phi);
     vb_paras.ELBO += accu(log(vb_paras.Var_beta))/2;
-    vb_paras.ELBO -= accu(log(vb_paras.E_beta_sq/2 + vb_paras.E_inv_a_beta));
-    vb_paras.ELBO += vb_paras.E_inv_a_beta * accu(vb_paras.E_inv_sigma2_beta);
+    vb_paras.ELBO -= ((1+hyperparas.nu)/2)*accu(log(vb_paras.E_beta_sq/2 + hyperparas.nu*vb_paras.E_inv_a_beta));
+    vb_paras.ELBO += hyperparas.nu*vb_paras.E_inv_a_beta * accu(vb_paras.E_inv_sigma2_beta);
     update_log_det_cov_mat();
     vb_paras.ELBO -= accu(vb_paras.log_det_cov_alpha)/2;
     vb_paras.ELBO -= accu(log(hyperparas.b_alpha + (vb_paras.E_alpha_sq + hyperparas.mu_alpha%hyperparas.mu_alpha - 2*vb_paras.E_alpha%hyperparas.mu_alpha)/2)*(hyperparas.a_alpha+0.5));
-    vb_paras.ELBO -= (dat.num_AEs+1)/2*log(accu(vb_paras.E_inv_sigma2_beta)+1);
+    vb_paras.ELBO -= (hyperparas.nu*dat.num_AEs+1)/2*log(hyperparas.nu*accu(vb_paras.E_inv_sigma2_beta)+1/hyperparas.eta2);
     //vb_paras.ELBO -= accu(log(cosh(vb_paras.E_phi/2)));
     update_log_cosh_b();
     vb_paras.ELBO -= accu(vb_paras.log_cosh_b);
@@ -301,7 +312,7 @@ public:
         if(vb_control.ELBO_stop==0){
           update_ELBO();
         }
-        if(iter%1000==0){
+        if(iter%2000==0){
           std::cout << "iter: " << iter <<  " ELBO: "<< vb_paras.ELBO << std::endl;
         }
       }
@@ -362,7 +373,9 @@ public:
   List get_vb_hyperparam(){
     return List::create(Named("a_alpha") =hyperparas.a_alpha,
                         Named("b_alpha") = hyperparas.b_alpha,
-                        Named("mu_alpha") = hyperparas.mu_alpha);
+                        Named("mu_alpha") = hyperparas.mu_alpha,
+                        Named("nu") = hyperparas.nu,
+                        Named("eta2") = hyperparas.eta2);
   };
   
   List get_vb_post_mean(){
@@ -386,6 +399,7 @@ public:
     arma::uvec iters = linspace<uvec>(1,iter,actual_profile_iter);
     return List::create(Named("iters") = iters,
                         Named("ELBO") = vb_profile.ELBO.rows(0,actual_profile_iter-1));
+    
     //Named("E_beta_arma::mat") = vb_profile.E_beta_arma::mat) ;
   }
   
@@ -418,6 +432,8 @@ List Bayes_Vacc_cpp(arma::mat& A, arma::mat& X, arma::vec& V,  arma::vec& nn,
                 arma::mat mu_alpha,
                 double a_alpha = 0.1,
                 double b_alpha = 0.1,
+                double nu = 1,
+                double eta2 = 1,
                 int max_iter = 1000,
                 double paras_diff_tol = 1e-6,
                 int ELBO_stop = 1,
@@ -431,7 +447,7 @@ List Bayes_Vacc_cpp(arma::mat& A, arma::mat& X, arma::vec& V,  arma::vec& nn,
   
   
   model.load_data(A,X,V, nn);
-  model.set_hyperparas(a_alpha, b_alpha, mu_alpha);
+  model.set_hyperparas(a_alpha, b_alpha, mu_alpha, nu, eta2);
   
   
   model.set_vb_control(max_iter,

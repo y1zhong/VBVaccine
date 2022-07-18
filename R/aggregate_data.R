@@ -2,43 +2,84 @@
 #' @import doParallel
 #' @import foreach
 #' @export
-prep_data = function(data, drug.case = NULL, drug.control = NULL,
-                            covar_cont = NULL, covar_disc = NULL,
-                            breaks = NULL, aggregate = FALSE){
-  AEs = sort(unique(data$AE_NAME))
-  if (aggregate) {
-    # # comb <- expand.grid(unique(data$Age),unique(data$Male),unique(data$VAX_TYPE)) %>%
-    # #   arrange(Var1, Var2, Var3)
-    # # colnames(comb) <- c("Age", "Male", "VAX_TYPE")
-    # nn = counts$n
-    # A = matrix(0, nrow(counts), length(AEs))
-    # colnames(A) = AEs
-    # for(i in 1:nrow(counts)){
-    #   data_sub = data[data$Age == counts$Age[i] &data$Male == counts$Male[i] &
-    #            data$VAX_TYPE == counts$VAX_TYPE[i] ,]
-    #   # data_sub = subset(data, Age==counts[i,1]& 
-    #   #                     Male==counts[i,2]& VAX_TYPE==counts[i,3])
-    #   A[i,] = sapply(1:length(AEs), function(j) sum(data_sub$AE_NAME == AEs[j]))
-    #   # nn[i] = nrow(data_sub)
-    # }
-    # # X = cov
-    # X = counts %>%
-    #   select(-n) %>%
-    #   as.matrix()
-    # X = cbind(Intercept = 1, X)
-    
-    results = count_cases(data, drug.case = drug.case, drug.control = drug.control,
-                covar_cont = covar_cont, covar_disc =covar_disc,
-                breaks = breaks) %>%
-       mutate(VAX_TYPE = as.numeric(VAX_TYPE == "DrugYes"))
-    AEs = sort(unique(results$AE_NAME))
-    A = matrix(results$AEYes, ncol = length(AEs))
-    colnames(A) = AEs
-    
-    X = cbind(1, results[, c(covar_cont, covar_disc,"VAX_TYPE")])
+prep_data = function(df, vax.case = NULL, vax.control = NULL,
+                     covar_cont = NULL,
+                     covar_disc = NULL, aggregate = FALSE,
+                     include_intercept = F){
   
+  if (aggregate) {
+    df <- df %>%
+      filter(VAX_LABEL %in% c(vax.case, vax.control)) %>%
+      mutate(VAX_LABEL = factor(as.numeric(VAX_LABEL == vax.case)))
+    colnames(df)[1:3] = c("ID",  "VAX_LABEL", "AE_NAME")
+    covar_cont_names = names(covar_cont)
+    covar_disc_names = names(covar_disc)
+    covars = c(covar_cont, covar_disc)
+    p=length(covars)
+    if(!is.null(covar_cont)){
+      for(i in 1:length(covar_cont)){
+        breaks_temp = covar_cont[[i]]
+        var_temp = covar_cont_names[i]
+        covar_group = df %>%
+          dplyr::select(all_of(var_temp)) %>%
+          unlist() %>%
+          findInterval(breaks_temp) %>%
+          as.factor()
+        
+        df = df %>%
+          dplyr::select(-all_of(var_temp)) %>%
+          tibble({{var_temp}} := covar_group)
+      }
+    }
+    
+    if(!is.null(covar_disc)){
+      for(i in 1:length(covar_disc)){
+        var_temp = covar_disc_names[i]
+        df[, var_temp] = factor(df[, var_temp,drop=TRUE], levels = covar_disc[[i]], labels=c(1:length(covar_disc[[i]]))-1)
+      }
+    }
+    
+    X = list()
+    for(i in 1:length(covar_cont)){
+      X[[i]] = seq(from=0,to=length(covar_cont[[i]]))
+    }
+    
+    Y = list()
+    for(i in 1:length(covar_disc)){
+      Y[[i]] = seq(from=0,to=length(covar_disc[[i]])-1)
+    }
+    V = list(V=c(0,1))
+    X = c(V, X, Y)
+    X = expand.grid(X)
+    colnames(X) = c("VAX_LABEL", covar_cont_names, covar_disc_names)
+    
+    grp_cols = c("VAX_LABEL", "AE_NAME", covar_cont_names, covar_disc_names)
+    data_count = df%>% dplyr::select(-ID) %>%
+      group_by_at(grp_cols) %>%
+      summarise(count = n(), .groups = "drop") %>%
+      pivot_wider(names_from = AE_NAME, values_from = count) %>%
+      replace(is.na(.), 0)
+    
+    data_merge = merge(X, data_count, all = T) %>%
+      replace(is.na(.), 0)
+    
+    
+    counts = df %>% count(!!sym("VAX_LABEL"), !!sym(covar_cont_names), !!sym(covar_disc_names), sort = TRUE)
+    nn = merge(X, counts, all = T) %>%
+      replace(is.na(.), 0)
+    nn=nn$n
+    
+    A = data_merge
+    V = A[, 1]
+    X = as.matrix(A[, c(covar_cont_names, covar_disc_names)])
+    A = A[, -which(colnames(A) %in%c("VAX_LABEL", covar_cont_names, covar_disc_names))]
+    if(include_intercept) X = cbind(intercept=1,X)
+    A = A %>% select(sort(names(.))) %>%
+      as.matrix()
+
   } else { 
-    X <- data %>%
+    AEs = sort(unique(df$AE_NAME))
+    X <- df %>%
       distinct()%>%
       mutate(Intercept = 1) %>%
       select(Intercept, Age,Male, VAX_TYPE) %>%
@@ -53,14 +94,13 @@ prep_data = function(data, drug.case = NULL, drug.control = NULL,
                 .packages = c("tidyverse"),
                 .combine=cbind
                 ) %dopar% {
-                  ifelse(data$AE_NAME == AEs[i], 1, 0)
+                  ifelse(df$AE_NAME == AEs[i], 1, 0)
                   }
     stopCluster(cl)
+    # idx = which(colnames(X) == "VAX_LABLE")
+    V = X[, 4]
+    X = X[, -4]
   }
-  
-  idx = which(colnames(X) == "VAX_TYPE")
-  V = X[, idx]
-  X = X[, -idx]
   
   return(data=list(A=A, nn=nn, X=X, V=V))
 }
@@ -91,10 +131,12 @@ aggregate_data = function(data) {
     new_X[i,] = X[indi_set[1],]
     new_V[i] = V[indi_set[1]]
   }
+  colnames(new_A) = colnames(data$A)
   data$A = new_A
   data$X = new_X
   data$V = new_V
   data$nn = new_nn
+  
   return(data)
 }
 
@@ -111,7 +153,7 @@ sequential_data = function(data, VB) {
     new_nn[i] = length(idx)
     new_A[i,] = colSums(data$A[idx, , drop = FALSE])
   }
-  
+  colnames(new_A) = colnames(data$A)
   return(data=list(A=new_A, nn=new_nn, X=VB$data$X, V=as.vector(VB$data$V)))
 }
 

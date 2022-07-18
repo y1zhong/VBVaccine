@@ -12,8 +12,8 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // Bayes_Vacc_cpp
-List Bayes_Vacc_cpp(arma::mat& A, arma::mat& X, arma::vec& V, arma::vec& nn, arma::vec initial_beta, arma::mat initial_alpha, arma::vec initial_inv_sigma2_beta, arma::mat initial_inv_sigma2_alpha, double initial_inv_a_beta, arma::mat mu_alpha, double a_alpha, double b_alpha, int max_iter, double paras_diff_tol, int ELBO_stop, double ELBO_diff_tol, int verbose, int save_profile);
-RcppExport SEXP _VBVaccine_Bayes_Vacc_cpp(SEXP ASEXP, SEXP XSEXP, SEXP VSEXP, SEXP nnSEXP, SEXP initial_betaSEXP, SEXP initial_alphaSEXP, SEXP initial_inv_sigma2_betaSEXP, SEXP initial_inv_sigma2_alphaSEXP, SEXP initial_inv_a_betaSEXP, SEXP mu_alphaSEXP, SEXP a_alphaSEXP, SEXP b_alphaSEXP, SEXP max_iterSEXP, SEXP paras_diff_tolSEXP, SEXP ELBO_stopSEXP, SEXP ELBO_diff_tolSEXP, SEXP verboseSEXP, SEXP save_profileSEXP) {
+List Bayes_Vacc_cpp(arma::mat& A, arma::mat& X, arma::vec& V, arma::vec& nn, arma::vec initial_beta, arma::mat initial_alpha, arma::vec initial_inv_sigma2_beta, arma::mat initial_inv_sigma2_alpha, double initial_inv_a_beta, arma::mat mu_alpha, double a_alpha, double b_alpha, double nu, double eta2, int max_iter, double paras_diff_tol, int ELBO_stop, double ELBO_diff_tol, int verbose, int save_profile);
+RcppExport SEXP _VBVaccine_Bayes_Vacc_cpp(SEXP ASEXP, SEXP XSEXP, SEXP VSEXP, SEXP nnSEXP, SEXP initial_betaSEXP, SEXP initial_alphaSEXP, SEXP initial_inv_sigma2_betaSEXP, SEXP initial_inv_sigma2_alphaSEXP, SEXP initial_inv_a_betaSEXP, SEXP mu_alphaSEXP, SEXP a_alphaSEXP, SEXP b_alphaSEXP, SEXP nuSEXP, SEXP eta2SEXP, SEXP max_iterSEXP, SEXP paras_diff_tolSEXP, SEXP ELBO_stopSEXP, SEXP ELBO_diff_tolSEXP, SEXP verboseSEXP, SEXP save_profileSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -29,19 +29,21 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< arma::mat >::type mu_alpha(mu_alphaSEXP);
     Rcpp::traits::input_parameter< double >::type a_alpha(a_alphaSEXP);
     Rcpp::traits::input_parameter< double >::type b_alpha(b_alphaSEXP);
+    Rcpp::traits::input_parameter< double >::type nu(nuSEXP);
+    Rcpp::traits::input_parameter< double >::type eta2(eta2SEXP);
     Rcpp::traits::input_parameter< int >::type max_iter(max_iterSEXP);
     Rcpp::traits::input_parameter< double >::type paras_diff_tol(paras_diff_tolSEXP);
     Rcpp::traits::input_parameter< int >::type ELBO_stop(ELBO_stopSEXP);
     Rcpp::traits::input_parameter< double >::type ELBO_diff_tol(ELBO_diff_tolSEXP);
     Rcpp::traits::input_parameter< int >::type verbose(verboseSEXP);
     Rcpp::traits::input_parameter< int >::type save_profile(save_profileSEXP);
-    rcpp_result_gen = Rcpp::wrap(Bayes_Vacc_cpp(A, X, V, nn, initial_beta, initial_alpha, initial_inv_sigma2_beta, initial_inv_sigma2_alpha, initial_inv_a_beta, mu_alpha, a_alpha, b_alpha, max_iter, paras_diff_tol, ELBO_stop, ELBO_diff_tol, verbose, save_profile));
+    rcpp_result_gen = Rcpp::wrap(Bayes_Vacc_cpp(A, X, V, nn, initial_beta, initial_alpha, initial_inv_sigma2_beta, initial_inv_sigma2_alpha, initial_inv_a_beta, mu_alpha, a_alpha, b_alpha, nu, eta2, max_iter, paras_diff_tol, ELBO_stop, ELBO_diff_tol, verbose, save_profile));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_VBVaccine_Bayes_Vacc_cpp", (DL_FUNC) &_VBVaccine_Bayes_Vacc_cpp, 18},
+    {"_VBVaccine_Bayes_Vacc_cpp", (DL_FUNC) &_VBVaccine_Bayes_Vacc_cpp, 20},
     {NULL, NULL, 0}
 };
 

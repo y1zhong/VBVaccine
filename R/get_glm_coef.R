@@ -14,6 +14,13 @@ get_glm_coefs = function(data,
       alpha_glm = coef(model)
       alpha_glm = pmin(alpha_glm,cutoff)
       alpha_glm = pmax(alpha_glm,-cutoff)
+      
+      pos_inf = which(alpha_glm == cutoff)
+      alpha_glm[pos_inf] <- rnorm(length(pos_inf), cutoff, 0.5)
+
+      neg_inf = which(alpha_glm == -cutoff)
+      alpha_glm[neg_inf] <- rnorm(length(neg_inf), cutoff, 0.5)
+      
       Alpha_glm[j,] =  alpha_glm
     }
   })
